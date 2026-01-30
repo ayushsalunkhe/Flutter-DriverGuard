@@ -1,0 +1,40 @@
+name: driver_guard
+description: "Driver Cognitive Load and Drowsiness Detection System"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # Camera & Vision
+  camera: ^0.10.5+9
+  google_mlkit_face_detection: ^0.10.0
+  
+  # State Management
+  provider: ^6.1.1
+  
+  # Storage
+  sqflite: ^2.3.0
+  path_provider: ^2.1.1
+  path: ^1.8.3
+  
+  # Audio/Alerts
+  audioplayers: ^5.2.1
+  
+  # Utilities
+  intl: ^0.19.0
+  collection: ^1.18.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/sounds/
