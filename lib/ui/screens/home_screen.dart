@@ -1,10 +1,14 @@
 import 'package:camera/camera.dart';
 import 'package:driver_guard/providers/driver_state_provider.dart';
+import 'package:driver_guard/ui/hud/live_waveform.dart';
+import 'package:driver_guard/ui/hud/tech_load_meter.dart';
+import 'package:driver_guard/ui/hud/vignette_overlay.dart';
 import 'package:driver_guard/ui/simulation/emergency_overlay.dart';
+import 'package:driver_guard/ui/theme.dart';
 import 'package:driver_guard/ui/widgets/alert_flasher.dart';
-import 'package:driver_guard/ui/widgets/glass_container.dart';
-import 'package:driver_guard/ui/widgets/load_meter.dart';
-import 'package:driver_guard/ui/widgets/status_indicator.dart';
+import 'package:driver_guard/ui/widgets/contrast_gradient_overlay.dart';
+import 'package:driver_guard/ui/widgets/glow_text.dart';
+import 'package:driver_guard/ui/widgets/modern_glass_card.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -25,76 +29,112 @@ class _HomeScreenState extends State<HomeScreen> {
         Provider.of<DriverStateProvider>(context, listen: false).initialize());
   }
 
-  @override
   Widget build(BuildContext context) {
     final driverState = Provider.of<DriverStateProvider>(context);
-
-    // Simulation Trigger
-    if (driverState.currentState == DriverState.DROWSY &&
-        driverState.cognitiveScore > 90) {
-      // Logic handled in provider/alert flasher mostly
-    }
 
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // 1. Camera Layer
+          // 1. Camera Feed
           if (driverState.isCameraInitialized)
             CameraPreview(driverState.cameraController!)
           else
             const Center(
-                child: CircularProgressIndicator(color: Color(0xFF00E5FF))),
+                child: CircularProgressIndicator(color: AppTheme.cyan)),
 
-          // 2. Alert Flasher Layer
+          // 3. Dynamic Vignette (Edge Glow)
+          VignetteOverlay(state: driverState.currentState),
+
+          // 4. Contrast Gradient (Bottom Shadow for readability)
+          const ContrastGradientOverlay(),
+
+          // 5. Alert Flasher
           AlertFlasher(state: driverState.currentState),
 
-          // 3. Main HUD Overlay
+          // 6. MAIN HUD UI
           SafeArea(
             child: Column(
               children: [
-                // TOP BAR: Status
-                Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: StatusIndicator(state: driverState.currentState),
-                ),
+                // --- TOP HUD: Dynamic Island (Moved to MainScaffold) ---
+                const SizedBox(height: 60), // Space for floating island
 
                 const Spacer(),
 
-                // BOTTOM DASHBOARD
+                // --- CENTER: Emergency Messages ---
+                if (driverState.isEmergencyTriggered)
+                  _buildEmergencyMessage(
+                      "EMERGENCY ALERT SENT", Colors.redAccent)
+                else if (driverState.dangerDuration > 0)
+                  _buildEmergencyMessage(
+                      "EMERGENCY PROTOCOL T-${10 - driverState.dangerDuration}",
+                      AppTheme.severeRed),
+
+                // --- BOTTOM HUD: Dashboard ---
                 Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: GlassContainer(
-                    blur: 15,
-                    opacity: 0.2,
-                    color: Colors.black,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0, vertical: 20.0),
+                  child: ModernGlassCard(
+                    blur: 10,
+                    opacity: 0.05, // Almost transparent
                     padding: const EdgeInsets.symmetric(
-                        vertical: 20, horizontal: 10),
+                        vertical: 20, horizontal: 16),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // Left: Load Meter
-                        LoadMeter(score: driverState.cognitiveScore),
+                        // Left: Tech Load Meter
+                        TechLoadMeter(score: driverState.cognitiveScore),
 
-                        // Center Divider
-                        Container(width: 1, height: 60, color: Colors.white24),
+                        // Center: Divider
+                        Container(width: 1, height: 60, color: Colors.white12),
 
-                        // Right: Stats
-                        Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildStatRow(
-                                "EAR",
-                                driverState.ear.toStringAsFixed(2),
-                                const Color(0xFF00E5FF)),
-                            const SizedBox(height: 10),
-                            _buildStatRow("BLINK", driverState.cognitiveLabel,
-                                const Color(0xFFFFC107)),
-                          ],
-                        ),
+                        // Right: Data Visualization
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Label
+                              const Text("ATTENTION METRICS",
+                                  style: TextStyle(
+                                      color: Colors.white54,
+                                      fontSize: 10,
+                                      letterSpacing: 2)),
+                              const SizedBox(height: 10),
+
+                              // Live Waveform (EAR)
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  const Text("EAR",
+                                      style: TextStyle(
+                                          color: AppTheme.cyan,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold)),
+                                  const SizedBox(width: 10),
+                                  LiveWaveform(
+                                      value: driverState.ear,
+                                      color: AppTheme.cyan),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+
+                              // Blink Rate
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  Text("BLINK ${driverState.cognitiveLabel}",
+                                      style: const TextStyle(
+                                          color: AppTheme.warningAmber,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold)),
+                                ],
+                              )
+                            ],
+                          ),
+                        )
                       ],
                     ),
                   ),
@@ -103,82 +143,27 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // 4. Simulated Emergency Overlay
+          // 7. Simulation Overlay
           if (_showEmergency)
             EmergencyOverlay(
                 onDismiss: () => setState(() => _showEmergency = false)),
-
-          // 5. Controls (Simulation)
-          Positioned(
-            right: 20,
-            bottom: 180,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Audio Test
-                _buildControlButton(
-                    icon: Icons.volume_up,
-                    color: Colors.teal,
-                    onTap: () async {
-                      final audio = Provider.of<DriverStateProvider>(context,
-                              listen: false)
-                          .audioService;
-                      await audio.playAlert();
-                      Future.delayed(
-                          const Duration(seconds: 2), () => audio.stopAlert());
-                    }),
-                const SizedBox(height: 15),
-                // Emergency Sim
-                _buildControlButton(
-                    icon: Icons.emergency,
-                    color: Colors.red,
-                    onTap: () => setState(() => _showEmergency = true)),
-              ],
-            ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildStatRow(String label, String value, Color color) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 50,
-          child: Text(label,
-              style: TextStyle(
-                  color: Colors.white54,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12)),
-        ),
-        Text(value,
-            style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.bold,
-                fontFamily: "monospace",
-                fontSize: 16)),
-      ],
-    );
-  }
-
-  Widget _buildControlButton(
-      {required IconData icon,
-      required Color color,
-      required VoidCallback onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-            color: color.withOpacity(0.2),
-            shape: BoxShape.circle,
-            border: Border.all(color: color, width: 2),
-            boxShadow: [
-              BoxShadow(color: color.withOpacity(0.4), blurRadius: 10)
-            ]),
-        child: Icon(icon, color: Colors.white, size: 24),
-      ),
+  Widget _buildEmergencyMessage(String text, Color color) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+      decoration: BoxDecoration(
+          color: color.withOpacity(0.9),
+          borderRadius: BorderRadius.circular(50),
+          boxShadow: [
+            BoxShadow(
+                color: color.withOpacity(0.6), blurRadius: 40, spreadRadius: 5)
+          ]),
+      child: GlowText(text, fontSize: 18, fontWeight: FontWeight.bold),
     );
   }
 }

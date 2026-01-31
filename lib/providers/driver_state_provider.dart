@@ -4,6 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import '../logic/drowsiness_detector.dart';
 import '../logic/cognitive_load.dart';
+import '../logic/emergency_manager.dart';
 import '../services/audio_service.dart';
 import '../database/database_helper.dart';
 import '../utils/constants.dart';
@@ -25,6 +26,7 @@ class DriverStateProvider with ChangeNotifier {
   final AudioService _audioService = AudioService();
   final CognitiveLoadEstimator _cogLoad = CognitiveLoadEstimator();
   final DatabaseHelper _db = DatabaseHelper();
+  final EmergencyManager _emergencyManager = EmergencyManager();
 
   // State
   DriverState _currentState = DriverState.AWAKE;
@@ -36,15 +38,29 @@ class DriverStateProvider with ChangeNotifier {
   DateTime? _lastFaceSeen;
   DateTime? _eyeClosedStartTime;
 
+  // Emergency Logic
+  DateTime? _dangerStartTime; // Track how long we are in danger
+  bool _emergencyTriggered = false;
+
+  // HUD Data
+  Face? _currentFace;
+
   // Getters
   CameraController? get cameraController => _cameraController;
   DriverState get currentState => _currentState;
+  Face? get currentFace => _currentFace;
   double get ear => _ear;
   double get cognitiveScore => _cognitiveScore;
   String get cognitiveLabel => _cognitiveLabel;
   AudioService get audioService => _audioService;
   bool get isCameraInitialized =>
       _cameraController != null && _cameraController!.value.isInitialized;
+
+  // Emergency State Getters
+  bool get isEmergencyTriggered => _emergencyTriggered;
+  int get dangerDuration => _dangerStartTime == null
+      ? 0
+      : DateTime.now().difference(_dangerStartTime!).inSeconds;
 
   Future<void> initialize() async {
     try {
@@ -92,6 +108,7 @@ class DriverStateProvider with ChangeNotifier {
       if (faces.isNotEmpty) {
         _lastFaceSeen = DateTime.now();
         final face = faces.first;
+        _currentFace = face;
 
         // 1. Calculate EAR (Modified for Contours)
         double currentEAR = DrowsinessDetector.calculateEAR(face);
@@ -147,7 +164,10 @@ class DriverStateProvider with ChangeNotifier {
   }
 
   void _updateState(DriverState newState) {
-    if (_currentState == newState) return;
+    if (_currentState == newState) {
+      _checkEmergencyEscalation(); // Check timer even if state is same
+      return;
+    }
 
     _currentState = newState;
     _db.logEvent(_sessionId ?? 0, newState.toString(), _cognitiveScore);
@@ -156,7 +176,39 @@ class DriverStateProvider with ChangeNotifier {
       _audioService.playAlert();
     } else {
       _audioService.stopAlert();
+      _dangerStartTime = null; // Reset if safe
     }
+
+    _checkEmergencyEscalation();
+  }
+
+  Future<void> _checkEmergencyEscalation() async {
+    if (_emergencyTriggered) return; // Already triggered
+
+    if (_currentState == DriverState.DROWSY ||
+        _currentState == DriverState.NO_FACE) {
+      if (_dangerStartTime == null) {
+        _dangerStartTime = DateTime.now();
+      } else {
+        final duration = DateTime.now().difference(_dangerStartTime!).inSeconds;
+        // NOTIFY UI of countdown via listener?
+        // Actually since this is called frequently, listeners will get updated
+        // implicitly if we call notifyListeners(), but we should be careful not to spam.
+        // Ideally we rely on the periodic timer in UI or frequent updates here.
+        if (duration >= 10) {
+          _emergencyTriggered = true;
+          _audioService
+              .stopAlert(); // Maybe stop looping alarm to focus on emergency? Or keep it?
+          // Keep it but maybe change tone? For now keep it.
+
+          await _emergencyManager
+              .triggerEmergencyProtocol(_currentState.toString());
+        }
+      }
+    } else {
+      _dangerStartTime = null;
+    }
+    notifyListeners(); // Update UI for countdown
   }
 
   @override

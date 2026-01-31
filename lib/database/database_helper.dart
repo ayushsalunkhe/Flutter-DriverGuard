@@ -6,7 +6,7 @@ import 'dart:io';
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
   factory DatabaseHelper() => _instance;
-  
+
   static Database? _database;
 
   DatabaseHelper._internal();
@@ -36,7 +36,7 @@ class DatabaseHelper {
         endTime TEXT
       )
     ''');
-    
+
     // Events Table
     await db.execute('''
       CREATE TABLE events (
@@ -45,6 +45,30 @@ class DatabaseHelper {
         type TEXT,
         value REAL,
         timestamp TEXT
+      )
+    ''');
+
+    // User Profile Table
+    await db.execute('''
+      CREATE TABLE user_profile (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        name TEXT,
+        blood_group TEXT,
+        emergency_contact TEXT,
+        medical_notes TEXT,
+        telegram_chat_id TEXT
+      )
+    ''');
+
+    // Emergency Logs Table
+    await db.execute('''
+      CREATE TABLE emergency_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TEXT,
+        trigger_reason TEXT,
+        latitude REAL,
+        longitude REAL,
+        status TEXT
       )
     ''');
   }
@@ -73,6 +97,33 @@ class DatabaseHelper {
       'type': type,
       'value': value,
       'timestamp': DateTime.now().toIso8601String(),
+    });
+  }
+
+  // --- Profile Methods ---
+  Future<void> saveProfile(Map<String, dynamic> profile) async {
+    final db = await database;
+    profile['id'] = 1;
+    await db.insert('user_profile', profile,
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<Map<String, dynamic>?> getProfile() async {
+    final db = await database;
+    final res = await db.query('user_profile', where: 'id = ?', whereArgs: [1]);
+    if (res.isNotEmpty) return res.first;
+    return null;
+  }
+
+  Future<void> logEmergency(
+      String reason, double lat, double lng, String status) async {
+    final db = await database;
+    await db.insert('emergency_logs', {
+      'timestamp': DateTime.now().toIso8601String(),
+      'trigger_reason': reason,
+      'latitude': lat,
+      'longitude': lng,
+      'status': status,
     });
   }
 }

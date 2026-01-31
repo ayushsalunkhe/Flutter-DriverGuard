@@ -1,30 +1,55 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
+  // 2026 Liquid Palette
+  static const Color cyan = Color(0xFF00E5FF);
+  static const Color deepNavy = Color(0xFF050510);
+  static const Color glassWhite = Colors.white;
+  static const Color severeRed = Color(0xFFFF2A68);
+  static const Color warningAmber = Color(0xFFFFC107);
+
   static final ThemeData darkTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
-    scaffoldBackgroundColor: Colors.black,
+    scaffoldBackgroundColor: deepNavy,
+    primaryColor: cyan,
     colorScheme: const ColorScheme.dark(
-      primary: Color(0xFF00E5FF), // Neon Cyan
-      secondary: Color(0xFFFF2A68), // Neon Red
-      tertiary: Color(0xFFFFC107), // Neon Amber
-      surface: Color(0xFF1E1E2C), // Deep Navy
-      background: Colors.black,
+      primary: cyan,
+      secondary: severeRed,
+      surface: Color(0xFF0A0A1F),
+      background: deepNavy,
+      error: severeRed,
     ),
-    textTheme: const TextTheme(
-      headlineLarge: TextStyle(
+
+    // Typography
+    textTheme: TextTheme(
+      displayLarge: const TextStyle(
+          fontFamily: 'monospace',
           fontSize: 32,
           fontWeight: FontWeight.bold,
-          color: Colors.white,
-          letterSpacing: 1.5),
-      headlineMedium: TextStyle(
-          fontSize: 20,
+          color: glassWhite),
+      headlineMedium: const TextStyle(
+          fontFamily: 'monospace',
+          fontSize: 24,
           fontWeight: FontWeight.w600,
-          color: Color(0xFF00E5FF), // Cyan
-          letterSpacing: 1.2),
-      bodyLarge: TextStyle(color: Colors.white70, fontSize: 16),
-      bodyMedium: TextStyle(color: Colors.white54, fontSize: 14),
+          color: glassWhite),
+      bodyLarge: TextStyle(
+          fontFamily: 'monospace',
+          fontSize: 16,
+          color: glassWhite.withOpacity(0.9)),
+      bodyMedium: TextStyle(
+          fontFamily: 'monospace',
+          fontSize: 14,
+          color: glassWhite.withOpacity(0.7)),
+    ),
+
+    // Other Themes
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      centerTitle: true,
+      titleTextStyle: TextStyle(
+          fontFamily: 'monospace', fontSize: 20, fontWeight: FontWeight.bold),
     ),
   );
 }
